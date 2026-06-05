@@ -7,8 +7,9 @@ library(ggplot2)
 library(jtools)
 library(lm.beta)
 library(rstatix)
-
-setwd("/Users/megsheppard/Desktop/OHBM R Analysis")
+library(ggeffects)
+library(dplyr)
+library(gridExtra)
 
 meg_data <- read.csv("/Users/megsheppard/Desktop/Desktop - Meg’s MacBook Pro/OHBM R Analysis/data.csv")
 
@@ -68,112 +69,25 @@ CTQ <- trauma_1 + trauma_2 + trauma_3 + trauma_4 + trauma_5
 biobank <- cbind(biobank_excluded, CTQ)
 
 
-
-
-#rename the variables and combine to make overall grey matter volumes
-#also whilst I'm doing this, times the volumes by the volume scaling factor
-greyvol_insular <- (biobank$Volume_of_grey_matter_in_Insular_Cortex_.left..y+ biobank$Volume_of_grey_matter_in_Insular_Cortex_.right..y)*biobank$Volume_scaling_factor
-greyvol_cingulate <- (biobank$Volume_of_grey_matter_in_Cingulate_Gyrus._anterior_division_.left..y+ biobank$Volume_of_grey_matter_in_Cingulate_Gyrus._anterior_division_.right..y)*biobank$Volume_scaling_factor
-greyvol_parahippgyrus <- (biobank$Volume_of_grey_matter_in_Parahippocampal_Gyrus._anterior_division_.left..y + biobank$Volume_of_grey_matter_in_Parahippocampal_Gyrus._anterior_division_.right..y 
-                          + biobank$Volume_of_grey_matter_in_Parahippocampal_Gyrus._posterior_division_.right..y + biobank$Volume_of_grey_matter_in_Parahippocampal_Gyrus._posterior_division_.left..y)*biobank$Volume_scaling_factor
-greyvol_thal <- (biobank$Volume_of_grey_matter_in_Thalamus_.left..y+ biobank$Volume_of_grey_matter_in_Thalamus_.right..y)*biobank$Volume_scaling_factor
-greyvol_hippocampus <- (biobank$Volume_of_grey_matter_in_Hippocampus_.left..y+biobank$Volume_of_grey_matter_in_Hippocampus_.right..y)*biobank$Volume_scaling_factor
+#rename the variable and combine to make overall grey matter volume
+#also whilst I'm doing this, times the volume by the volume scaling factor
 greyvol_amygdala <- (biobank$Volume_of_grey_matter_in_Amygdala_.left..y+ biobank$Volume_of_grey_matter_in_Amygdala_.right..y)*biobank$Volume_scaling_factor
-greyvol_striatum <- (biobank$Volume_of_grey_matter_in_Ventral_Striatum_.left..y + biobank$Volume_of_grey_matter_in_Ventral_Striatum_.right..y)*biobank$Volume_scaling_factor
 
-#adds the new volume IDPS as columns in the biobank dataframe
-biobank <- cbind(biobank, greyvol_insular)
-biobank <- cbind(biobank, greyvol_cingulate)
-biobank <- cbind(biobank, greyvol_parahippgyrus)
-biobank <- cbind(biobank, greyvol_thal)
-biobank <- cbind(biobank, greyvol_hippocampus)
-biobank <- cbind(biobank, greyvol_striatum)
+#adds the new volume IDP as a column in the biobank dataframe
 biobank <- cbind(biobank, greyvol_amygdala)
 
-#sensitivity analyses
-outliers.insula <- biobank %>% identify_outliers(greyvol_insular) %>% 
-  filter(is.extreme==TRUE) %>% select(-c("is.outlier","is.extreme"))
-
-biobank <- biobank %>% anti_join(outliers.insula)
-
-outliers.cingulate <- biobank %>% identify_outliers(greyvol_cingulate) %>% 
-  filter(is.extreme==TRUE) %>% select(-c("is.outlier","is.extreme"))
-
-biobank <- biobank %>% anti_join(outliers.cingulate)
-
-outliers.parahipp <- biobank %>% identify_outliers(greyvol_parahippgyrus) %>% 
-  filter(is.extreme==TRUE) %>% select(-c("is.outlier","is.extreme"))
-
-biobank <- biobank %>% anti_join(outliers.parahipp)
-
-outliers.thal <- biobank %>% identify_outliers(greyvol_thal) %>% 
-  filter(is.extreme==TRUE) %>% select(-c("is.outlier","is.extreme"))
-
-biobank <- biobank %>% anti_join(outliers.thal)
-
-outliers.hippocampus <- biobank %>% identify_outliers(greyvol_hippocampus) %>% 
-  filter(is.extreme==TRUE) %>% select(-c("is.outlier","is.extreme"))
-
-biobank <- biobank %>% anti_join(outliers.hippocampus)
+#sensitivity analysis
 
 outliers.amy <- biobank %>% identify_outliers(greyvol_amygdala) %>% 
   filter(is.extreme==TRUE) %>% select(-c("is.outlier","is.extreme"))
 
 biobank <- biobank %>% anti_join(outliers.amy)
 
-outliers.striatum <- biobank %>% identify_outliers(greyvol_striatum) %>% 
-  filter(is.extreme==TRUE) %>% select(-c("is.outlier","is.extreme"))
-
-biobank <- biobank %>% anti_join(outliers.striatum)
-
+#work out the average, sd and range of CTQ scores within my sample
 mean(biobank$child_stress)
 sd(biobank$child_stress)
 range(biobank$child_stress) 
 
-#now doing multiple linear regression models that control for both age and sex 
-#also running the associated confidence intervals
-lm_amyg <- lm(greyvol_amygdala~biobank$child_stress + biobank$Age_at_visit + biobank$Sex_.0.F._1.M., data = biobank)
-summary(lm_amyg)
-confint(lm_amyg, level = 0.95)
-
-summ(lm_amyg)
-lm.beta(lm_amyg, complete.standardization = FALSE)
-
-amy <- ggplot(data=biobank, aes(child_stress, greyvol_amygdala)) + geom_point()
-thal <- ggplot(data=biobank, aes(child_stress, greyvol_thal)) + geom_point()
-striatum <- ggplot(data=biobank, aes(child_stress, greyvol_striatum)) + geom_point()
-
-
-lm_insular <- lm(greyvol_insular~biobank$child_stress + biobank$Age_at_visit + biobank$Sex_.0.F._1.M., data = biobank)
-summary(lm_insular)
-confint(lm_insular, level = 0.95)
-
-lm_cingulate <- lm(greyvol_cingulate~biobank$child_stress + biobank$Age_at_visit + biobank$Sex_.0.F._1.M., data = biobank)
-summary(lm_cingulate)
-confint(lm_cingulate, level = 0.95)
-
-lm_parahipp <- lm(greyvol_parahippgyrus~biobank$child_stress + biobank$Age_at_visit + biobank$Sex_.0.F._1.M., data = biobank)
-summary(lm_parahipp)
-confint(lm_parahipp, level = 0.95)
-
-lm_thal <- lm(greyvol_thal~biobank$child_stress + biobank$Age_at_visit + biobank$Sex_.0.F._1.M., data = biobank)
-summary(lm_thal)
-confint(lm_thal, level = 0.95)
-
-summ(lm_thal)
-lm.beta(lm_thal, complete.standardization = FALSE)
-
-
-lm_hippo <- lm(greyvol_hippocampus~biobank$child_stress + biobank$Age_at_visit + biobank$Sex_.0.F._1.M., data = biobank)
-summary(lm_hippo) 
-confint(lm_hippo, level = 0.95)
-
-lm_striatum <- lm(greyvol_striatum~biobank$child_stress + biobank$Age_at_visit + biobank$Sex_.0.F._1.M., data = biobank)
-summary(lm_striatum)
-confint(lm_striatum, level = 0.95)
-
-summ(lm_striatum)
-lm.beta(lm_striatum, complete.standardization = FALSE)
 
 ##############demographics
 
@@ -194,10 +108,6 @@ male <- biobank %>% filter (Sex_.0.F._1.M. == 1) %>%
 
 male_sd <- biobank %>% filter (Sex_.0.F._1.M. == 1) %>%
   summarise(sd_age = sd(Age_at_visit))
-
-#average and sd of CTQ score
-av_CTQ <- mean(biobank$child_stress)
-sd_CTQ <- sd(biobank$child_stress)
 
 #number of ethnicity entries
 ethnicity_1001 <- biobank %>% count(ethnicity == 1001)
@@ -222,18 +132,96 @@ ethnicity_2004 <- biobank %>% count(ethnicity == 2004)
 ethnicity_neg3 <- biobank %>% count(ethnicity == -3)
 ethnicity_neg1 <- biobank %>% count(ethnicity == -1)
 
-ggplot(biobank, aes(x=greyvol_amygdala, y=child_stress)) + geom_line()
+biobank$Age_c <- biobank$Age_at_visit - mean(biobank$Age_at_visit, na.rm = TRUE)
 
-library(rstatix)
-outliers.amygdala<- biobank %>% identify_outliers(greyvol_amygdala) %>% 
-  filter(is.extreme==TRUE) %>% select(-c("is.outlier","is.extreme"))
+# Modelling
 
-greyvol_amygdala <- biobank %>% anti_join(outliers.amygdala)
+#initial regression model to look at the associations between ELS and amygdala volume ±95%CIs
+lm_amyg <- lm(greyvol_amygdala~biobank$child_stress + biobank$Age_at_visit + biobank$Sex_.0.F._1.M., data = biobank)
+summary(lm_amyg)
+confint(lm_amyg, level = 0.95)
 
-ggplot(greyvol_amygdala, aes(x=greyvol_amygdala, y=child_stress)) + geom_point() + geom_smooth()
+summ(lm_amyg)
+lm.beta(lm_amyg, complete.standardization = FALSE)
 
-outliers.striatum<- biobank %>% identify_outliers(greyvol_striatum) %>% 
-filter(is.extreme==TRUE) %>% select(-c("is.outlier","is.extreme"))
+summary(lm_amyg)
 
-greyvol_striatum <- biobank %>% anti_join(outliers.striatum)
-ggplot(greyvol_striatum, aes(x=greyvol_striatum, y=child_stress)) + geom_point() + geom_smooth()
+#this is the centered age model looking at the interaction of cta and age polynomially and linearly
+#this is now an exploratory trajectory analysis (out of interest, limited due to cross-sectional nature)
+
+#defining the interaction term to look at the effect of ELS on trajectory within this sample
+lm_amyg <- lm( greyvol_amygdala ~ child_stress * Age_c + Sex_.0.F._1.M., data = biobank)
+
+#defining the interaction term polynomially 
+lm_amyg_nonlinear <- lm( greyvol_amygdala ~ child_stress * (Age_c + I(Age_c^2)) + Sex_.0.F._1.M., data = biobank)
+summary(lm_amyg_nonlinear)
+
+#visualising the differences (or lack there of) between polynomial trajectories of 2±sd from the mean
+pred <- ggpredict(
+  lm_amyg_nonlinear,
+  terms = c("Age_c [all]", "child_stress [-1,4]")
+)
+
+ggplot(pred,
+       aes(x = x, y = predicted,
+           colour = group,
+           fill = group)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = conf.low,
+                  ymax = conf.high),
+              alpha = .2,
+              colour = NA) +
+  labs(
+    x = "Centered age",
+    y = "Predicted amygdala volume",
+    colour = "CTQ",
+    fill = "CTQ"
+  ) +
+  theme_classic()
+
+
+### now looking at age bins to see if there are any age specific effects that are lost in the wider model
+biobank$age_group <- cut(biobank$Age_at_visit,breaks = c(49, 55, 60, 65, 70), include.lowest = TRUE)
+
+#running a model for each of the bins,
+lm_bins <- lm( greyvol_amygdala ~ child_stress * age_group + Sex_.0.F._1.M., data = bioban)
+summary(lm_bins)
+
+#generate predicted effects inc confidence intervals that can be read into the plot
+eff <- ggpredict(lm_amyg, terms = "child_stress")
+
+#this plots the overall regression line and includes a ribbon for the 95% confidence intervals from the predicted data defined above
+p1 <- ggplot() + geom_line(data = eff, aes(x = x, y = predicted), linewidth = 1) +
+  geom_ribbon(data = eff, aes(x = x, ymin = conf.low, ymax = conf.high), alpha = 0.15) +
+  labs(x = "Childhood stress", y = "Amygdala grey matter volume") +
+  theme_classic(base_size = 12) + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+#plotting a standardised beta plot to outline the contributions of each of the variables within th model
+coefs <- summary(lm_amyg)$coefficients
+coefs <- as.data.frame(coefs)
+coefs$term <- rownames(coefs)
+
+# remove intercept
+coefs <- coefs[coefs$term != "(Intercept)", ]
+
+# standardise using sds to help create partially standardized coefficient to allow us to cmpare the predictors
+sd_y <- sd(biobank$greyvol_amygdala, na.rm = TRUE)
+sd_x_child <- sd(biobank$child_stress, na.rm = TRUE)
+sd_x_age   <- sd(biobank$Age_at_visit, na.rm = TRUE)
+sd_x_sex   <- sd(biobank$Sex_.0.F._1.M., na.rm = TRUE)
+
+#puts the standardised betas and standard deviations into a table to plot 
+coefs <- coefs %>%  mutate( beta_std = Estimate * c(sd_x_child, sd_x_age, sd_x_sex), se_std   = `Std. Error` * c(sd_x_child, sd_x_age, sd_x_sex),
+    term = case_when( term == "child_stress" ~ "Childhood Stress", term == "Age_at_visit" ~ "Age", term == "Sex_.0.F._1.M." ~ "Sex",
+      TRUE ~ term))
+
+#plot the information ±95%CIs
+p2 <- ggplot(coefs, aes(x = reorder(term, beta_std), y = beta_std)) +
+  geom_point(size = 2) + geom_errorbar(aes( ymin = beta_std - 1.96 * se_std,ymax = beta_std + 1.96 * se_std),
+    width = 0.2) +
+  coord_flip() +
+  labs(x = NULL, y = "Standardised beta (β, 95% CI)") + theme_classic(base_size = 12)
+
+#combine both figures to one final overall figure.
+final_fig <- grid.arrange(p1, p2, ncol = 2)
+
